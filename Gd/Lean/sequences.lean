@@ -1,16 +1,31 @@
-import Mathlib
 import Mathlib.Algebra.Order.Field.Basic
-
 import Mathlib.Data.Real.Basic
+
+import Mathlib
+
+open BigOperators Finset
+
+-- Simple lemma showing that if
+-- a_{k} ≤ D_{k} - D_{k+1} and a_{k+1} ≤ a_{k}
+-- then a_{k} ≤ D_{0} / (k+1) for all k
+
+--Proof below due to Terence Tao
+theorem rate_from_monotonic_and_telescope_ub (a D : ℕ → ℝ) (hD : ∀ k, a k ≤ D k - D (k+1)) (hpos: ∀ k, 0 ≤ D k) (ha : Antitone a) (k: ℕ) : a k ≤ D 0 / (k+1) := calc
+
+    a k = (∑ _i in range (k+1), a k) / (k+1) := by simp; field_simp; ring
+
+    _ ≤ (∑ i in range (k+1), (D i - D (i+1))) / (k+1) := by gcongr with i hi; apply le_trans _ (hD i); simp at hi; apply ha.imp; linarith
+
+    _ ≤ D 0 / (k+1) := by gcongr; rw [sum_range_sub']; linarith [hpos (k+1)]
+
+
 
 -- Simple lemma showing that if $a > 0$ and $b \leq c$ then $b*a \leq c*a$
 theorem multiply_both_sides {a b c : Real} (ha : 0 < a) (hbc : b ≤ c) : b*a ≤ c*a := by
   exact (mul_le_mul_right ha).mpr hbc
 
--- Simple lemma showing that if
--- a_{k} ≤ D_{k} - D_{k+1} and a_{k+1} ≤ a_{k}
--- then a_{k} ≤ D_{0} / (k+1) for all k
-theorem rate_from_monotonic_and_telescope_ub (a : Nat -> Real) (D : Nat → NNReal) :
+-- My initial proof
+theorem rate_from_monotonic_and_telescope_ub_v1 (a : Nat -> Real) (D : Nat → Real) (h_dnn : ∀ k : Nat, D k ≥ 0) :
 (∀ k : Nat, (a k ≤ D k - D (k+1)) ∧ (a (k+1) ≤ a k)) ->
 (∀ k : Nat , a k ≤ (D 0) / ↑(k+1)) := by
   intro h
@@ -22,7 +37,7 @@ theorem rate_from_monotonic_and_telescope_ub (a : Nat -> Real) (D : Nat → NNRe
     have hr : 0 < r := by simp
     have h1 : D (k+1) ≤ D 0 - (a k) * r := by simp [h_hat k]
     have h2 : (a k) * r + D (k+1) ≤ D 0 := by linarith
-    have h3 : (a k) * r ≤  (a k) * r + D (k+1) := by simp
+    have h3 : (a k) * r ≤  (a k) * r + D (k+1) := by simp [h_dnn (k+1)]
     have h4 : (a k) * r ≤ D 0 := by linarith
     have h5 : (a k) ≤ D 0 / r := ((@le_div_iff ℝ _ ak ↑D0 r) hr).mpr h4
     have h6 : (a k) ≤ (D 0) / ↑(k+1) := h5
