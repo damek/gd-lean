@@ -62,6 +62,7 @@ theorem LittleO_convex_lb_non_neg
     calc f y
       _ = g (y - x) := by simp [g]
       _ ≥ 0 := by exact h_gnonneg (y - x) h_shift_y
+
   ------------------- End WLOG part of the proof -------------------
 
   ------------------- Main part of the proof -------------------
@@ -78,7 +79,7 @@ theorem LittleO_convex_lb_non_neg
     apply And.intro hδ.left
     intro t ht
     exact hδ.right ht
-  -- Prove that f(y) ≥ f(t y)/t on the line.
+  -- Prove that g(y) ≥ g(t y)/t on the line.
   have h_4 : ∀ (t : ℝ), (0 < t) ∧ (t < 1) → (g y) ≥ g (t•y)/t:= by
     intro t ht
     have sum_cond : 1- t + t = 1 := by
