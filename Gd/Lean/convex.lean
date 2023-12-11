@@ -1,82 +1,76 @@
 import Mathlib
+import Gd.Lean.Basic
 
 open Set InnerProductSpace Filter Metric Convex Group Asymptotics
 
+--------------------------------------------------------------------------------
+---- The heart of the theorem ----
+--------------------------------------------------------------------------------
 
----- Begin Helper Lemmatta ----
-
--- BigO post composition preserves LittleO
----- Structure of the proof
----- Assume φ = O(x) on R
----- Prove that φ ∘ f = O(f) on R by "Comp"
-  ---- For this we will apply Asymptotics.IsBigO.comp_tendsto.
-  ---- To do this we need to prove that (Filter.Tendsto f l (nhds 0))
----- Use transitivity to prove that
----- (φ ∘ f = O(f)) (f = o(u)) :  φ∘f = o(u) (this is the theorem Asymptotics.IsBigO.trans_isLittleO)
-theorem IsLittleO_comp_left {α : Type u_1} {f : α → ℝ} {l : Filter α} {u : α → ℝ} {φ : ℝ → ℝ} (h_φ : φ=O[(nhds 0)] (fun x : ℝ => x)) (h_f_LittleO_1 : f=o[l] fun _x => (1 : ℝ)) :
-  f =o[l] u → (fun y => φ (f y)) =o[l] u := by
-  -- First prove that Filter.Tendsto f l (nhds 0)
-  have h_f_filter : (Filter.Tendsto f l (nhds 0)) := by
-    rw [isLittleO_one_iff] at h_f_LittleO_1
-    exact h_f_LittleO_1
-  -- Then apply Asymptotics.IsBigO.comp_tendsto
-  have h_comp : (fun y => φ (f y)) =O[l] f := by
-    exact IsBigO.comp_tendsto h_φ h_f_filter
-
-  intro h_f_LittleO_u
-  have h_comp' : (fun y => φ (f y)) =o[l] u := by
-    exact IsBigO.trans_isLittleO h_comp h_f_LittleO_u
-
-  exact h_comp'
-
--- Showing that min x 0 = o(x) on R
--- To prove unfold into metric definition of little o
-theorem min_with_zero_is_BigO_id : (fun x : ℝ => min x 0) =O[(nhds 0)] (fun x : ℝ => x) := by
-  rw [@IsBigO_def]
-  use 1
-  rw [@isBigOWith_iff]
-  rw [@Metric.eventually_nhds_iff]
-  use 1
-  constructor
-  . linarith -- prove 1 > 0
-  . intro y _hy
-    cases (le_or_lt y 0) with
-    | inl h_y_nonpos =>
-      simp [h_y_nonpos]
-    | inr h_y_pos =>
-      have h_y_pos' : |y| = y := by exact abs_of_pos h_y_pos
-      simp [h_y_pos']
-      have h_min_pos : min y 0 = 0 := by exact min_eq_right_of_lt h_y_pos
-      calc |min y 0|
-        _ = 0 := by simp [h_min_pos]
-        _ ≤ y := by linarith
-
----- End Helper Lemmatta ----
-
----- Begin: the heart of the theorem ----
-
--- Theorem shows that if $f 0 = 0$ and f y ≥ o(y) on a convex set s, then f y ≥ 0 for all y in s.
----- Pf: For all t ∈ (0, 1), we have
+-- Theorem shows that if $f x = 0$ and f y ≥ o(y-x) on a convex set s, then f y ≥ 0 for all y in s.
+---- Pf: Without loss of generality $x = 0$.
+------- For all t ∈ (0, 1), we have
 ------- f(y) ≥ f(ty)/t ≥ o(t)/t.
 ------- The left hand side is constant, while the right hand side tends to zero as t → 0.
-theorem LittleO_convex_lb_non_neg_zero
+---- Note: for smooth functions, we have the stronger assumption f(y) = o(y - x);
+------ I'm working with the weaker assumption here since it may prove useful later.
+theorem LittleO_convex_lb_non_neg
 {F : Type u}
 [NormedAddCommGroup F]
 [InnerProductSpace ℝ F]
 [CompleteSpace F]
 (f : F → ℝ)
+(x : F)
 (s : Set F)
-(h_zero : 0 ∈ s)
+(h_zero : x ∈ s)
 (h_convex : ConvexOn ℝ s f)
-(h_base_point : f 0 = 0)
-(h_LittleO : (fun y => min (f y) 0) =o[(nhds 0)] (fun y => norm y)):
+(h_base_point : f x = 0)
+(h_LittleO : (fun y => min (f y) 0) =o[(nhds x)] (fun y => norm (y-x))):
 ∀ y ∈ s, 0 ≤ f y := by
+
+  ------------------- Setting up the WLOG part of the proof -------------------
+  have h_filter : Filter.Tendsto (fun y => y + x) (nhds 0) (nhds x) := by
+    simp [@tendsto_nhds_nhds]
+    intro ε hε
+    use ε
+    constructor
+    . exact hε
+    . intro y hy
+      exact hy
+
+  ---- Use this to deduce that g : y ↦ mapsto f(y + x) is little o of norm y using IsLittleO.comp_tendsto
+  have shift_is_littleO : (fun y => min (f (y + x) ) 0) =o[(nhds 0)] (fun y => norm (y+ x - x)) := by
+    exact IsLittleO.comp_tendsto h_LittleO h_filter
+
+  let g := fun y => f (y + x)
+  replace shift_is_littleO : (fun (y : F) => min (g y) 0 )=o[(nhds 0)] (fun (y : F) => norm y) := by
+    simp [g] at *
+    exact shift_is_littleO
+
+  have h_gconvex : ConvexOn ℝ ((fun (z : F) => x + z) ⁻¹' s) g := by
+    exact ConvexOn.translate_left h_convex x
+  have h_gbase : g 0 = 0 := by
+    simp [g, h_base_point]
+  have h_zero_shift : 0 ∈ ((fun (z : F) => x + z) ⁻¹' s) := by
+    simp [h_zero]
+
+  suffices h_gnonneg : ∀ y ∈ ((fun (z : F) => x + z) ⁻¹' s), 0 ≤ g y
+  . intro y hys
+    have h_shift_y : y - x ∈ ((fun (z : F) => x + z) ⁻¹' s) := by
+      simp [hys]
+
+    calc f y
+      _ = g (y - x) := by simp [g]
+      _ ≥ 0 := by exact h_gnonneg (y - x) h_shift_y
+  ------------------- End WLOG part of the proof -------------------
+
+  ------------------- Main part of the proof -------------------
   intro y hys
   -- Replace the LittleO with a Tendsto
-  have h_2 : Tendsto (fun x => (min (f x) 0) / norm x) (nhds 0) (nhds 0) := IsLittleO.tendsto_div_nhds_zero h_LittleO
+  have h_2 : Tendsto (fun x => (min (g x) 0) / norm x) (nhds 0) (nhds 0) := IsLittleO.tendsto_div_nhds_zero shift_is_littleO
   -- Replace Tendsto with epsilon delta notation.
   simp [@tendsto_nhds_nhds] at h_2
-  have h_3 : ∀ (ε : ℝ), 0 < ε → ∃ δ, 0 < δ ∧ ∀ {t : ℝ}, ‖t•y‖ < δ → |min (f (t•y)) 0| / ‖t•y‖ < ε := by
+  have h_3 : ∀ (ε : ℝ), 0 < ε → ∃ δ, 0 < δ ∧ ∀ {t : ℝ}, ‖t•y‖ < δ → |min (g (t•y)) 0| / ‖t•y‖ < ε := by
     intro ε hε
     apply Exists.elim (h_2 ε hε)
     intro δ hδ
@@ -85,29 +79,30 @@ theorem LittleO_convex_lb_non_neg_zero
     intro t ht
     exact hδ.right ht
   -- Prove that f(y) ≥ f(t y)/t on the line.
-  have h_4 : ∀ (t : ℝ), (0 < t) ∧ (t < 1) → (f y) ≥ f (t•y)/t:= by
+  have h_4 : ∀ (t : ℝ), (0 < t) ∧ (t < 1) → (g y) ≥ g (t•y)/t:= by
     intro t ht
     have sum_cond : 1- t + t = 1 := by
       rw [@sub_add_cancel]
-    have nb_pos : (1-t) > 0 := by
+    have nb_pos : 0 < (1-t) := by
       linarith
-    rw [convexOn_iff_forall_pos] at h_convex
-    have h_4' : t•(f y) ≥ f (t•y) := by
-      calc t•(f y)
-        _ = 0 + t•(f y)  := by rw [@self_eq_add_left]
-        _ = (f 0) + t•(f y) := by rw [h_base_point]
-        _ = (1-t)•(f 0) + t•(f y) := by field_simp; ring_nf; simp; apply Or.inr; exact h_base_point
-        _ ≥ f ((1-t)•0 + t•y) := by apply h_convex.right h_zero hys nb_pos ht.left sum_cond
-        _ = f (t•y) := by simp
+
+    rw [convexOn_iff_forall_pos] at h_gconvex
+    have h_4' : t•(g y) ≥ g (t•y) := by
+      calc t•(g y)
+        _ = 0 + t•(g y)  := by rw [@self_eq_add_left]
+        _ = (g 0) + t•(g y) := by rw [h_gbase]
+        _ = (1-t)•(g 0) + t•(g y) := by field_simp; ring_nf; simp; apply Or.inr; exact h_base_point
+        _ ≥ g ((1-t)•0 + t•y) := by apply h_gconvex.right h_zero_shift hys nb_pos ht.left sum_cond
+        _ = g (t•y) := by simp
     simp
     simp at h_4'
     have ht' : 0 < t := by
       linarith
-    have h_4'' : f (t•y) ≤ (f y)*t := by rw [mul_comm]; exact h_4'
+    have h_4'' : g (t•y) ≤ (g y)*t := by rw [mul_comm]; exact h_4'
     exact (div_le_iff ht').mpr h_4''
 
   -- To prove that f y is nonnegative, give your self an epsilon of room.
-  suffices h_1 : ∀ ε > 0, 0 - ε ≤ f y
+  suffices h_1 : ∀ ε > 0, 0 - ε ≤ g y
   . exact le_of_forall_sub_le h_1
 
   intro ε hε
@@ -153,112 +148,53 @@ theorem LittleO_convex_lb_non_neg_zero
       _ < δ := by linarith
 
     -- Simplifying the epsilon of room.
-    suffices _ : ε ≥ - f y
+    suffices _ : ε ≥ - g y
     . linarith
 
     -- Applying hδ to upper bound the min.
-    have h_sub : ε/(norm y) > abs (min (f (t • y)) 0) / (t * (norm y))
+    have h_sub : ε/(norm y) > abs (min (g (t • y)) 0) / (t * (norm y))
       := calc ε/(norm y)
         _ = ε' := by apply Eq.symm; simp [ε']
-        _ > abs (min (f (t • y)) 0) / ‖t • y‖ := by apply hδ.right; exact ht'
-        _ = abs (min (f (t • y)) 0) / (t * (norm y)) := by rw [norm_smul_of_nonneg]; linarith
+        _ > abs (min (g (t • y)) 0) / ‖t • y‖ := by apply hδ.right; exact ht'
+        _ = abs (min (g (t • y)) 0) / (t * (norm y)) := by rw [norm_smul_of_nonneg]; linarith
 
     ---- Replacing previous hypothesis after multiplying by norm y
-    replace h_sub : ε > abs (min (f (t • y)) 0) / t :=
+    replace h_sub : ε > abs (min (g (t • y)) 0) / t :=
       calc ε
         _ = (ε / norm y) * norm y := by apply Eq.symm; field_simp; apply mul_inv_cancel_right₀; linarith [norm_pos_iff.mpr h_neq]
-        _ > (abs (min (f (t • y)) 0) / (t * (norm y))) * norm y := by rw [gt_iff_lt]; exact mul_lt_mul_of_pos_right h_sub (norm_pos_iff.mpr h_neq)
-        _ = (abs (min (f (t • y)) 0) /t) * norm y * (norm y)⁻¹ := by field_simp
-        _ = (abs (min (f (t • y)) 0) /t) := by apply mul_inv_cancel_right₀; linarith [norm_pos_iff.mpr h_neq]
+        _ > (abs (min (g (t • y)) 0) / (t * (norm y))) * norm y := by rw [gt_iff_lt]; exact mul_lt_mul_of_pos_right h_sub (norm_pos_iff.mpr h_neq)
+        _ = (abs (min (g (t • y)) 0) /t) * norm y * (norm y)⁻¹ := by field_simp
+        _ = (abs (min (g (t • y)) 0) /t) := by apply mul_inv_cancel_right₀; linarith [norm_pos_iff.mpr h_neq]
 
-    -- Lower bound the min by - f(ty)
-    have h_remove_min : abs (min (f (t • y)) 0) ≥ -(f (t•y)) :=
-      calc abs (min (f (t • y)) 0)
-        _ ≥ -(min (f (t • y)) 0) := by exact neg_le_abs_self (min (f (t • y)) 0)
-        _ = max (-(f (t • y))) (-0) := by apply Eq.symm; exact max_neg_neg (f (t • y)) 0
-        _ ≥ -(f (t • y)) := by exact le_max_left (-f (t • y)) (-0)
+    -- Lower bound the min by - g(ty)
+    have h_remove_min : abs (min (g (t • y)) 0) ≥ -(g (t•y)) :=
+      calc abs (min (g (t • y)) 0)
+        _ ≥ -(min (g (t • y)) 0) := by exact neg_le_abs_self (min (g (t • y)) 0)
+        _ = max (-(g (t • y))) (-0) := by apply Eq.symm; exact max_neg_neg (g (t • y)) 0
+        _ ≥ -(g (t • y)) := by exact le_max_left (-g (t • y)) (-0)
 
     ---- Dividing both sides by t.
-    replace h_remove_min : abs (min (f (t • y)) 0)/t ≥ -(f (t•y))/t := by
+    replace h_remove_min : abs (min (g (t • y)) 0)/t ≥ -(g (t•y))/t := by
       exact (div_le_div_right ht).mpr h_remove_min
 
     -- Reversing some hypothesis foruse in the final calculation
-    have h_4_reverse :  -f y ≤ -((f (t•y))/t) := by
+    have h_4_reverse :  -g y ≤ -((g (t•y))/t) := by
       exact neg_le_neg (h_4 t ht_ds)
-    replace h_4_reverse :  -(f (t•y)/t) ≥ -f y := by
+    replace h_4_reverse :  -(g (t•y)/t) ≥ -g y := by
       exact h_4_reverse
 
     ---- Final calculation: combining h_sub, h_remove_min, and h_4_reverse.
     calc ε
-      _ ≥ abs (min (f (t • y)) 0) / t := by linarith [h_sub]
-      _ ≥ -(f (t•y))/t := h_remove_min
-      _ ≥ -((f (t•y))/t) := by field_simp
-      _ ≥ -(f y) := by exact h_4_reverse
+      _ ≥ abs (min (g (t • y)) 0) / t := by linarith [h_sub]
+      _ ≥ -(g (t•y))/t := h_remove_min
+      _ ≥ -((g (t•y))/t) := by field_simp
+      _ ≥ -(g y) := by exact h_4_reverse
 
 
----- This theorem shows that if $f x = 0$ and $f y ≥ 0(y-x)$ on a convex set $s$, then f y ≥ 0 for all y.
----- The proof is a direct application of LittleO_convex_lb_non_neg_zero, which is the special case in which x = 0.
-theorem LittleO_convex_lb_non_neg
-{F : Type u}
-[NormedAddCommGroup F]
-[InnerProductSpace ℝ F]
-[CompleteSpace F]
-(f : F → ℝ)
-(x : F)
-(s : Set F)
-(h_zero : x ∈ s)
-(h_convex : ConvexOn ℝ s f)
-(h_base_point : f x = 0)
-(h_LittleO : (fun y => min (f y) 0) =o[(nhds x)] (fun y => norm (y-x))):
-∀ y ∈ s, 0 ≤ f y := by
-  have h_filter : Filter.Tendsto (fun y => y + x) (nhds 0) (nhds x) := by
-    simp [@tendsto_nhds_nhds]
-    intro ε hε
-    use ε
-    constructor
-    . exact hε
-    . intro y hy
-      exact hy
-
-  ---- How use this to deduce that g : y ↦ mapsto f(y + x) is little o of norm y using Asymptotics.IsLittleO.comp_tendsto
-  have shift_is_littleO : (fun y => min (f (y + x) ) 0) =o[(nhds 0)] (fun y => norm (y+ x - x)) := by
-    exact IsLittleO.comp_tendsto h_LittleO h_filter
-
-  let g := fun y => f (y + x)
-  replace shift_is_littleO : (fun (y : F) => min (g y) 0 )=o[(nhds 0)] (fun (y : F) => norm y) := by
-    simp [g] at *
-    exact shift_is_littleO
-
-  have h_gconvex : ConvexOn ℝ ((fun (z : F) => x + z) ⁻¹' s) g := by
-    exact ConvexOn.translate_left h_convex x
-  have h_gbase : g 0 = 0 := by
-    simp [g, h_base_point]
-  have h_zero_shift : 0 ∈ ((fun (z : F) => x + z) ⁻¹' s) := by
-    simp [h_zero]
-
-  have h_gnonneg : ∀ y ∈ ((fun (z : F) => x + z) ⁻¹' s), 0 ≤ g y := by
-    exact LittleO_convex_lb_non_neg_zero g ((fun (z : F) => x + z) ⁻¹' s) h_zero_shift h_gconvex h_gbase shift_is_littleO
-
-  intro y hys
-  have h_shift_y : y - x ∈ ((fun (z : F) => x + z) ⁻¹' s) := by
-    simp [hys]
-
-  calc f y
-    _ = g (y - x) := by simp [g]
-    _ ≥ 0 := by exact h_gnonneg (y - x) h_shift_y
-
-
----- End: the heart of the theorem ----
-
-
----- Begin: Main theorem ----
-
-
----- This theorem shows that if f is convex on a set s and differentiable at a point x ∈ s, then ∀ y ∈ s, f y ≥ f x + inner f' (y - x)
----- The proof in english is:
------- WLOG assume that x = 0 and f x = 0. Then we need to show that
------- f(y) - inner f' y ≥ 0 for all y ∈ s.
------- However, by assumption g(y) = f(y) - inner f' y ≥ o(y) on s, so by LittleO_convex_lb_non_neg_zero, g(y) ≥ 0 for all y ∈ s.
+---- Theorem shows that if f is convex on a set s and differentiable at a point x ∈ s, then ∀ y ∈ s, f y ≥ f x + inner f' (y - x)
+---- Proof:
+------ We consider the convex function g(y) := f(y) - f(x) - inner f' (y-x).
+------ By assumption g(y) = o(y) on s, so by LittleO_convex_lb_non_neg, g(y) ≥ 0 for all y ∈ s.
 theorem differentiable_gradient_inequality
 {F : Type u}
 [NormedAddCommGroup F]
@@ -272,10 +208,11 @@ theorem differentiable_gradient_inequality
 (h_x_in_s : x ∈ s)
 (h : ConvexOn ℝ s f) :
 ∀ y ∈ s, f y ≥ f x + inner f' (y - x) := by
--- Show that the function y → f y - inner f' y is convex.
----- Will add the constant term in later in the proof.
------- An Alternative way would be to define a linear mapping and use that such mappings are convex.
------- I got frustrated reading the API, so I did it directly.
+
+------------- Show that the function y → f y - inner f' y is convex ----------------
+  ---- Will add the constant term in later in the proof.
+  ------ An Alternative way would be to define a linear mapping and use that such mappings are convex.
+  ------ I got frustrated reading the API, so I did it directly.
   let g_1 := fun y => f y - inner f' y
   have h_gconvex : ConvexOn ℝ s g_1 := by
     rw [convexOn_iff_forall_pos]
@@ -295,7 +232,7 @@ theorem differentiable_gradient_inequality
   have h_g : ConvexOn ℝ s g := by
     exact ConvexOn.add_const h_gconvex (-f x + inner f' x)
 
-  --- Show that g 0 = 0.
+  --- Show that g x = 0.
   have h_g0 : g x = 0 := by
     calc g x
       _ = (f x - inner f' x) + (fun _ => - f x + inner f' x) x := by simp
@@ -323,9 +260,9 @@ theorem differentiable_gradient_inequality
   ----------
 
   ----------
-  -- So we know that $g = o(y - x)$, but I want to deduce that min g 0 =o(y - x) instead (because of how the theorem above is stated)
+  -- We know that g = o(y - x). I want to deduce that min{g(y), 0} =o(y - x), which is equivalent to g(y) ≥ o(y - x)).
   ---- To do this, we need to apply IsLittleO_comp_left, which allows us to scale a little o identity by a φ=O(x) identity.
-  ---- To apply the theorem, we first need to show that norm (y- x) =o(1). I couldn't find this in the lean library.
+  ---- To apply the theorem, we first need to show that norm (y-x) =o(1). I couldn't find this in the lean library.
   ------ We will later apply this result to ensure that g = o(1), which is needed for the theorem.
   have h_norm_LittleO_1 : (Filter.Tendsto (fun y : F => norm (y - x)) (nhds x) (nhds 0)) := by
     rw [@tendsto_nhds_nhds]
