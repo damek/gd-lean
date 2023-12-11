@@ -39,7 +39,7 @@ theorem min_with_zero_is_BigO_id : (fun x : ℝ => min x 0) =O[(nhds 0)] (fun x 
   use 1
   constructor
   . linarith -- prove 1 > 0
-  . intro y hy
+  . intro y _hy
     cases (le_or_lt y 0) with
     | inl h_y_nonpos =>
       simp [h_y_nonpos]
