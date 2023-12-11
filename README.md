@@ -10,6 +10,7 @@ https://x.com/damekdavis/status/1728120500142940284?s=20
 4. A lemma about convergence rates of sequences (with a guest appearnece by Terry Tao):
 
 https://x.com/damekdavis/status/1730983634570510819?s=20
+
 https://terrytao.wordpress.com/2023/12/05/a-slightly-longer-lean-4-proof-tour/
 
 3. Formalizing the 'gradient inequality' for smooth convex functions:
