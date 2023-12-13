@@ -15,3 +15,7 @@ https://x.com/damekdavis/status/1728120500142940284?s=20
 ### Formalizing the 'gradient inequality' for smooth convex functions:
 
 https://x.com/damekdavis/status/1734238424083661046?s=20
+
+### Formalizing the Descent Lemma for differentiable functions with Lipschitz gradients
+
+https://x.com/damekdavis/status/1734961810241953896?s=20
