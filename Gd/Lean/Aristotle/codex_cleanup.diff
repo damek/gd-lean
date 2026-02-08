@@ -1,0 +1,77 @@
+--- gd-lean/e623ec93-eb6e-4db9-a318-9702e060e589-output.lean	2026-02-05 12:54:09
++++ gd-lean/Gd/Lean/Aristotle/Proof.lean	2026-02-08 17:49:19
+@@ -67,7 +67,7 @@
+         intro t ht
+         have h_inner : inner ℝ (gradient f (x + t • (y - x))) (y - x) - inner ℝ (gradient f x) (y - x) ≤ L * t * ‖y - x‖^2 := by
+           have h_inner : ‖gradient f (x + t • (y - x)) - gradient f x‖ ≤ L * t * ‖y - x‖ := by
+-            convert h_lip.norm_sub_le ( x + t • ( y - x ) ) x using 1 ; simp +decide [ norm_smul, abs_of_nonneg ht.1 ] ; ring;
++            convert h_lip.norm_sub_le ( x + t • ( y - x ) ) x using 1 ; simp +decide [ norm_smul, abs_of_nonneg ht.1 ] ; ring_nf;
+           have := abs_le.mp ( abs_real_inner_le_norm ( gradient f ( x + t • ( y - x ) ) - gradient f x ) ( y - x ) );
+           rw [ inner_sub_left ] at this ; nlinarith [ norm_nonneg ( y - x ) ];
+         linarith;
+@@ -84,8 +84,8 @@
+   (hη : 0 ≤ η) :
+   f (x - η • gradient f x) ≤ f x - η * (1 - L * η / 2) * ‖gradient f x‖ ^ 2 := by
+   have := @descent_lemma E _ _ _ f x ( x - η • gradient f x ) L hf h_lip;
+-  convert this using 1 ; simp +decide [ inner_sub_left, inner_smul_left, inner_smul_right ] ; ring;
+-  rw [ norm_smul, Real.norm_eq_abs, abs_of_nonneg hη ] ; rw [ real_inner_self_eq_norm_sq ] ; ring;
++  convert this using 1 ; simp +decide [ inner_smul_right ] ; ring_nf;
++  rw [ norm_smul, Real.norm_eq_abs, abs_of_nonneg hη ] ; rw [ real_inner_self_eq_norm_sq ] ; ring_nf;
+ 
+ /-
+ If the step size is small enough (η ≤ 1/L), gradient descent is monotone decreasing.
+@@ -101,7 +101,7 @@
+   -- Apply the descent lemma with the given step size.
+   have h_desc : f (x - η • gradient f x) ≤ f x - η * (1 - L * η / 2) * ‖gradient f x‖ ^ 2 := by
+     convert gd_decrease hf h_lip hη_pos using 1;
+-  by_cases hL : L = 0 <;> simp_all +decide [ div_le_iff₀, mul_div_assoc ];
++  by_cases hL : L = 0 <;> simp_all +decide [ mul_div_assoc ];
+   · cases le_antisymm hη_le hη_pos ; aesop;
+   · exact h_desc.trans ( sub_le_self _ ( mul_nonneg ( mul_nonneg hη_pos ( sub_nonneg.2 <| by nlinarith [ inv_mul_cancel₀ ( show ( L : ℝ ) ≠ 0 by positivity ), show ( L : ℝ ) ≥ 0 by positivity ] ) ) ( sq_nonneg _ ) ) )
+ 
+@@ -123,7 +123,7 @@
+         have h_convex_def : ConvexOn ℝ Set.univ f := by
+           exact hf_conv
+         convert h_convex_def.2 ( Set.mem_univ x ) ( Set.mem_univ y ) ( by linarith [ ht.1, ht.2 ] : 0 ≤ 1 - t ) ( by linarith [ ht.1, ht.2 ] : 0 ≤ t ) ( by linarith [ ht.1, ht.2 ] ) using 1 ; simp +decide [ add_comm, smul_sub ];
+-        simp +decide [ sub_smul, add_comm, add_left_comm, add_assoc ];
++        simp +decide [ sub_smul ];
+         exact congr_arg f ( by abel1 );
+       exact h_convex;
+     -- By definition of the derivative, we know that
+@@ -148,7 +148,7 @@
+   (hf_conv : ConvexOn ℝ Set.univ f)
+   (hf_diff : Differentiable ℝ f)
+   (h_lip : LipschitzWith L (gradient f))
+-  (h_min : ∀ z, f x_star ≤ f z)
++  (_h_min : ∀ z, f x_star ≤ f z)
+   (hη_pos : 0 < η)
+   (hη_le : η ≤ 1 / L) :
+   f (x - η • gradient f x) - f x_star ≤ (1 / (2 * η)) * (‖x - x_star‖ ^ 2 - ‖(x - η • gradient f x) - x_star‖ ^ 2) := by
+@@ -156,16 +156,16 @@
+   have h_first_order : f x - f x_star ≤ inner ℝ (gradient f x) (x - x_star) := by
+     have h_first_order : f x + inner ℝ (gradient f x) (x_star - x) ≤ f x_star := by
+       apply_rules [ convex_first_order_condition ];
+-    simp_all +decide [ inner_sub_left, inner_sub_right ];
++    simp_all +decide [ inner_sub_right ];
+     linarith;
+   -- By the descent lemma, we have $$f(x - η∇f(x)) ≤ f(x) - η(1 - Lη/2)‖∇f(x)‖².$$
+   have h_descent : f (x - η • gradient f x) ≤ f x - η * (1 - L * η / 2) * ‖gradient f x‖ ^ 2 := by
+     convert gd_decrease hf_diff h_lip hη_pos.le using 1;
+   -- By the properties of the inner product and the norm, we can expand and simplify the expression.
+   have h_expand : ‖x - η • gradient f x - x_star‖ ^ 2 = ‖x - x_star‖ ^ 2 - 2 * η * inner ℝ (gradient f x) (x - x_star) + η ^ 2 * ‖gradient f x‖ ^ 2 := by
+-    simp +decide [ *, norm_sub_sq_real, inner_sub_left, inner_sub_right, inner_smul_left, inner_smul_right ] ; ring;
+-    rw [ norm_smul, Real.norm_eq_abs, abs_of_nonneg hη_pos.le ] ; ring;
+-    rw [ real_inner_comm ] ; ring;
++    simp +decide [ *, norm_sub_sq_real, inner_sub_left, inner_sub_right, inner_smul_left, inner_smul_right ] ; ring_nf;
++    rw [ norm_smul, Real.norm_eq_abs, abs_of_nonneg hη_pos.le ] ; ring_nf;
++    rw [ real_inner_comm ] ; ring_nf;
+   by_cases hL : L = 0 <;> simp_all +decide [ div_eq_inv_mul ];
+   · linarith;
+   · field_simp;
+@@ -214,4 +214,4 @@
+       rw [ Finset.sum_range_succ ] ; linarith!;
+   refine' le_trans ( h_ind k ) ( le_trans ( mul_le_mul_of_nonneg_left ( h_telescope k ) ( by positivity ) ) _ );
+   field_simp;
+-  exact sub_le_self _ ( sq_nonneg _ )
+\ No newline at end of file
++  exact sub_le_self _ ( sq_nonneg _ )
