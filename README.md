@@ -1,6 +1,12 @@
 # gd-lean
 
-In progress: A rate of convergence for gradient descent on smooth and convex functions, proved in Lean4.
+
+A rate of convergence for gradient descent on smooth and convex functions, proved in Lean4.
+
+From December 2023 through April 2025, I used completing this proof as a benchmark for testing formalization ability in language models.
+In January 2026, I tried Aristotle with a GPT-5.2 Pro (Extended Thinking) blueprint, and it completed the formalization in about 15 minutes.
+
+
 
 ## Final Update (February 8, 2026)
 
@@ -22,7 +28,7 @@ Generation flow:
 
 Codex cleanup note: "file already typechecked; i only cleaned proof-script noise so it runs clean. specifically: replaced a few ring calls with ring_nf, removed unused simp args, and renamed unused h_min to _h_min to silence the linter. no mathematical changes."
 
-I periodically tried to complete this proof with language models through April 2025, and none could do it. Aristotle was the first that could.
+I periodically tried to complete this proof with language models from December 2023 through April 2025, and none could do it. Aristotle was the first that could.
 
 ## Hand-Proof History
 
